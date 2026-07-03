@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
+import { AuthProvider } from "@/lib/auth-context";
+import { AppStoreProvider } from "@/lib/app-store";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -32,7 +34,11 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <ThemeProvider>
-          <TooltipProvider>{children}</TooltipProvider>
+          <AuthProvider>
+            <AppStoreProvider>
+              <TooltipProvider>{children}</TooltipProvider>
+            </AppStoreProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

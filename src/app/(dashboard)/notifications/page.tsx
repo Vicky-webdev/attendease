@@ -1,149 +1,133 @@
 "use client";
 
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
+  CalendarPlus,
+  CheckCircle2,
+  Laptop,
   Clock,
-  CalendarCheck,
-  CalendarX,
-  Home,
-  AlertTriangle,
-  Gift,
-  Megaphone,
-  Check,
+  Bell,
+  MessageCircle,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { useAuth } from "@/lib/auth-context";
+import { useAppStore } from "@/lib/app-store";
 
-const notifications = [
-  {
-    id: 1,
-    icon: AlertTriangle,
-    iconColor: "text-status-late",
-    iconBg: "bg-status-late-bg",
-    title: "Late check-in reminder",
-    description: "Raj Patel checked in at 9:18 AM, 18 minutes late",
-    time: "9:18 AM",
-    unread: true,
-  },
-  {
-    id: 2,
-    icon: CalendarCheck,
-    iconColor: "text-status-present-text",
-    iconBg: "bg-status-present-bg",
-    title: "Leave approved",
-    description: "Your casual leave for Jun 30 has been approved by Arjun Mehta",
-    time: "Yesterday",
-    unread: true,
-  },
-  {
-    id: 3,
-    icon: Home,
-    iconColor: "text-status-wfh-text",
-    iconBg: "bg-status-wfh-bg",
-    title: "WFH request pending",
-    description: "Raj Patel has requested WFH for Jul 4",
-    time: "Yesterday",
-    unread: true,
-  },
-  {
-    id: 4,
-    icon: Clock,
-    iconColor: "text-status-halfday-text",
-    iconBg: "bg-status-halfday-bg",
-    title: "Missing checkout",
-    description:
-      "Naveen Krishnan didn't check out yesterday. Please update attendance.",
-    time: "Jul 2",
-    unread: false,
-  },
-  {
-    id: 5,
-    icon: CalendarX,
-    iconColor: "text-status-absent-text",
-    iconBg: "bg-status-absent-bg",
-    title: "Leave rejected",
-    description:
-      "Lakshmi Rajan's casual leave for Jun 20 was rejected due to team availability",
-    time: "Jun 19",
-    unread: false,
-  },
-  {
-    id: 6,
-    icon: Gift,
-    iconColor: "text-status-leave-text",
-    iconBg: "bg-status-leave-bg",
-    title: "Birthday reminder",
-    description: "Sara Kumar's birthday is on Jul 8. Don't forget to wish!",
-    time: "Jun 30",
-    unread: false,
-  },
-  {
-    id: 7,
-    icon: Megaphone,
-    iconColor: "text-primary",
-    iconBg: "bg-primary/10",
-    title: "Company announcement",
-    description: "Independence Day celebration and office closure on Aug 15",
-    time: "Jun 28",
-    unread: false,
-  },
-];
+const iconMap: Record<string, typeof Bell> = {
+  leave: CalendarPlus,
+  permission: Clock,
+  wfh: Laptop,
+  approval: CheckCircle2,
+  system: Bell,
+  chat: MessageCircle,
+};
+
+const colorMap: Record<string, string> = {
+  leave: "text-status-leave bg-status-leave-bg",
+  permission: "text-status-permission bg-status-permission-bg",
+  wfh: "text-status-wfh bg-status-wfh-bg",
+  approval: "text-status-present bg-status-present-bg",
+  system: "text-primary bg-primary/10",
+  chat: "text-blue-600 bg-blue-50",
+};
 
 export default function NotificationsPage() {
-  const unreadCount = notifications.filter((n) => n.unread).length;
+  const { user } = useAuth();
+  const { notifications, markNotificationRead, markAllNotificationsRead } =
+    useAppStore();
+
+  const role = user?.role || "employee";
+  const myId = user?.employee.id;
+  const visible = notifications.filter((n) => {
+    if (!n.forRoles.includes(role as any)) return false;
+    if (role === "employee" && n.employeeId && n.employeeId !== myId) return false;
+    return true;
+  });
+  const unreadCount = visible.filter((n) => !n.read).length;
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-3xl">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-lg font-medium">Notifications</h1>
           <p className="text-sm text-muted-foreground">
-            {unreadCount} unread notification{unreadCount !== 1 ? "s" : ""}
+            {unreadCount > 0
+              ? `${unreadCount} unread notification${unreadCount > 1 ? "s" : ""}`
+              : "All caught up"}
           </p>
         </div>
-        <Button variant="outline" size="sm">
-          <Check className="w-4 h-4 mr-2" />
-          Mark all read
-        </Button>
+        {unreadCount > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={markAllNotificationsRead}
+          >
+            Mark all read
+          </Button>
+        )}
       </div>
 
       <div className="space-y-2">
-        {notifications.map((n) => (
-          <Card
-            key={n.id}
-            className={`p-4 transition-colors ${
-              n.unread ? "border-primary/20 bg-primary/[0.02]" : ""
-            }`}
-          >
-            <div className="flex gap-3">
-              <div
-                className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${n.iconBg}`}
-              >
-                <n.icon className={`w-4 h-4 ${n.iconColor}`} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <p
-                    className={`text-sm ${
-                      n.unread ? "font-medium" : ""
-                    }`}
-                  >
-                    {n.title}
-                  </p>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    {n.time}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {n.description}
-                </p>
-              </div>
-              {n.unread && (
-                <span className="w-2 h-2 rounded-full bg-primary shrink-0 mt-2" />
-              )}
-            </div>
+        {visible.length === 0 && (
+          <Card className="p-8 text-center">
+            <Bell className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">
+              No notifications yet
+            </p>
           </Card>
-        ))}
+        )}
+        {visible.map((notif) => {
+          const Icon = iconMap[notif.type] || Bell;
+          const colors = colorMap[notif.type] || "text-muted-foreground bg-muted";
+          const timeAgo = getTimeAgo(notif.time);
+          return (
+            <Card
+              key={notif.id}
+              className={`p-4 cursor-pointer transition-colors hover:bg-muted/30 ${
+                !notif.read ? "border-l-4 border-l-primary" : ""
+              }`}
+              onClick={() => markNotificationRead(notif.id)}
+            >
+              <div className="flex items-start gap-3">
+                <div
+                  className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${colors}`}
+                >
+                  <Icon className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <p
+                      className={`text-sm ${!notif.read ? "font-medium" : ""}`}
+                    >
+                      {notif.title}
+                    </p>
+                    <span className="text-[11px] text-muted-foreground shrink-0 ml-2">
+                      {timeAgo}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {notif.message}
+                  </p>
+                </div>
+                {!notif.read && (
+                  <span className="w-2 h-2 rounded-full bg-primary shrink-0 mt-2" />
+                )}
+              </div>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );
+}
+
+function getTimeAgo(isoString: string): string {
+  const diff = Date.now() - new Date(isoString).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
 }
