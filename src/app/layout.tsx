@@ -4,6 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/lib/auth-context";
 import { AppStoreProvider } from "@/lib/app-store";
+import { NetworkSettingsProvider } from "@/lib/network-settings";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 const inter = Inter({
@@ -34,11 +36,14 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <ThemeProvider>
+          <NetworkSettingsProvider>
           <AuthProvider>
             <AppStoreProvider>
               <TooltipProvider>{children}</TooltipProvider>
+              <Toaster position="top-right" richColors closeButton />
             </AppStoreProvider>
           </AuthProvider>
+          </NetworkSettingsProvider>
         </ThemeProvider>
       </body>
     </html>

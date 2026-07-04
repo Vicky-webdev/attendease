@@ -9,8 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/lib/auth-context";
-
-const OFFICE_NETWORK_PREFIX = "192.168.1.";
+import { useNetworkSettings } from "@/lib/network-settings";
 
 function generateQrMatrix(data: string): boolean[][] {
   const size = 25;
@@ -104,6 +103,7 @@ export default function LoginPage() {
   const [qrScanned, setQrScanned] = useState(false);
   const [demoOverride, setDemoOverride] = useState(false);
   const { login, isAuthenticated, loading } = useAuth();
+  const { settings: networkSettings } = useNetworkSettings();
   const router = useRouter();
 
   useEffect(() => {
@@ -119,15 +119,20 @@ export default function LoginPage() {
         const data = await res.json();
         const ip = data.ip || "unknown";
         setCurrentIp(ip);
-        const isPrivate = ip.startsWith("192.168.") || ip.startsWith("10.") || ip.startsWith("172.");
-        setNetworkStatus(isPrivate ? "office" : "external");
+
+        if (!networkSettings.officePublicIp) {
+          setNetworkStatus("office");
+          return;
+        }
+        const isOfficeIp = ip === networkSettings.officePublicIp;
+        setNetworkStatus(isOfficeIp ? "office" : "external");
       } catch {
         setCurrentIp("unknown");
         setNetworkStatus("external");
       }
     }
     checkNetwork();
-  }, []);
+  }, [networkSettings.officePublicIp]);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -241,12 +246,12 @@ export default function LoginPage() {
           ) : isOffice ? (
             <>
               <Wifi className="w-4 h-4" />
-              <span>{demoOverride ? "Demo mode — office WiFi simulated" : `Office network detected (${currentIp})`}</span>
+              <span>{demoOverride ? "Demo mode — office WiFi simulated" : `Connected to ${networkSettings.officeWifiSsid || "office"} — IP ${currentIp} matches office`}</span>
             </>
           ) : (
             <>
               <WifiOff className="w-4 h-4" />
-              <span>Not on office WiFi — login restricted</span>
+              <span>Your IP {currentIp} doesn&apos;t match office — connect to {networkSettings.officeWifiSsid || "office"} WiFi</span>
             </>
           )}
         </div>

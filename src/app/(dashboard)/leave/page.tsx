@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Calendar, Clock } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { Plus, Calendar, Clock, Mail, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -28,11 +29,22 @@ import { getEmployee, getInitials } from "@/lib/mock-data";
 import { useAuth, isManager } from "@/lib/auth-context";
 import { useAppStore } from "@/lib/app-store";
 import { format } from "date-fns";
+import { toast } from "sonner";
 import type { LeaveType } from "@/types";
 
 export default function LeavePage() {
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState("leave");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [requestType, setRequestType] = useState("leave");
+
+  useEffect(() => {
+    const newType = searchParams.get("new");
+    if (newType && ["leave", "wfh", "permission"].includes(newType)) {
+      setRequestType(newType);
+      setDialogOpen(true);
+    }
+  }, [searchParams]);
   const [leaveType, setLeaveType] = useState<LeaveType>("casual");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -56,6 +68,18 @@ export default function LeavePage() {
   const canApprove = user ? isManager(user.role) : false;
   const isRegularEmployee = user ? user.role === "employee" : true;
   const myId = user?.employee.id || "";
+  const myName = user?.employee.name || "";
+
+  const resetForm = () => {
+    setStartDate("");
+    setEndDate("");
+    setReason("");
+    setWfhDate("");
+    setWfhReason("");
+    setPermOutTime("");
+    setPermReason("");
+    setLeaveType("casual");
+  };
 
   const handleSubmitLeave = () => {
     if (!startDate || !endDate || !reason) return;
@@ -66,18 +90,29 @@ export default function LeavePage() {
       endDate,
       reason,
     });
-    setStartDate("");
-    setEndDate("");
-    setReason("");
+    resetForm();
     setDialogOpen(false);
+    toast.success("Leave request submitted", {
+      description: `${leaveType} leave from ${format(new Date(startDate), "MMM d")} to ${format(new Date(endDate), "MMM d")} — sent to your manager and HR for approval.`,
+    });
+    toast("Email notification sent", {
+      description: "Admin and HR have been notified via email about your leave request.",
+      icon: <Mail className="w-4 h-4" />,
+    });
   };
 
   const handleSubmitWfh = () => {
     if (!wfhDate || !wfhReason) return;
     addWfhRequest({ employeeId: myId, date: wfhDate, reason: wfhReason });
-    setWfhDate("");
-    setWfhReason("");
+    resetForm();
     setDialogOpen(false);
+    toast.success("WFH request submitted", {
+      description: `Work from home for ${format(new Date(wfhDate), "MMM d, yyyy")} — sent to your manager and HR for approval.`,
+    });
+    toast("Email notification sent", {
+      description: "Admin and HR have been notified via email about your WFH request.",
+      icon: <Mail className="w-4 h-4" />,
+    });
   };
 
   const handleSubmitPermission = () => {
@@ -88,14 +123,44 @@ export default function LeavePage() {
       outTime: permOutTime,
       reason: permReason,
     });
-    setPermOutTime("");
-    setPermReason("");
+    resetForm();
     setDialogOpen(false);
+    toast.success("Permission request submitted", {
+      description: `Permission to leave at ${permOutTime} — sent to your manager and HR for approval.`,
+    });
+    toast("Email notification sent", {
+      description: "Admin and HR have been notified via email about your permission request.",
+      icon: <Mail className="w-4 h-4" />,
+    });
   };
 
-  const filteredLeave = isRegularEmployee ? leaveRequests.filter(r => r.employeeId === myId) : leaveRequests;
-  const filteredWfh = isRegularEmployee ? wfhRequests.filter(r => r.employeeId === myId) : wfhRequests;
-  const filteredPerm = isRegularEmployee ? permissionRequests.filter(r => r.employeeId === myId) : permissionRequests;
+  const handleApprove = (type: "leave" | "wfh" | "permission", id: string, empName: string) => {
+    updateRequestStatus(type, id, "approved", myId);
+    toast.success(`Request approved`, {
+      description: `${empName}'s ${type} request has been approved. They will be notified.`,
+    });
+    toast("Email notification sent", {
+      description: `${empName} has been notified via email about the approval.`,
+      icon: <Mail className="w-4 h-4" />,
+    });
+  };
+
+  const handleReject = (type: "leave" | "wfh" | "permission", id: string, empName: string) => {
+    updateRequestStatus(type, id, "rejected", myId);
+    toast.error(`Request rejected`, {
+      description: `${empName}'s ${type} request has been rejected. They will be notified.`,
+    });
+  };
+
+  const filteredLeave = isRegularEmployee
+    ? leaveRequests.filter((r) => r.employeeId === myId)
+    : leaveRequests;
+  const filteredWfh = isRegularEmployee
+    ? wfhRequests.filter((r) => r.employeeId === myId)
+    : wfhRequests;
+  const filteredPerm = isRegularEmployee
+    ? permissionRequests.filter((r) => r.employeeId === myId)
+    : permissionRequests;
 
   const leaveBalance = [
     { type: "Casual", total: 12, used: 4, remaining: 8 },
@@ -113,7 +178,7 @@ export default function LeavePage() {
             Manage leave, WFH, and permission requests
           </p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
           <DialogTrigger className="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium bg-primary hover:bg-teal-600 text-primary-foreground transition-colors cursor-pointer">
             <Plus className="w-4 h-4 mr-2" />
             New request
@@ -122,7 +187,20 @@ export default function LeavePage() {
             <DialogHeader>
               <DialogTitle>New request</DialogTitle>
             </DialogHeader>
-            <Tabs defaultValue="leave" className="mt-2">
+
+            {/* Approval flow info */}
+            <div className="bg-muted/50 rounded-lg p-3 text-xs text-muted-foreground flex items-start gap-2">
+              <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
+              <div>
+                <p className="font-medium text-foreground">Approval flow</p>
+                <p className="mt-0.5">
+                  Your request will be sent to your <strong>reporting manager</strong> and <strong>HR</strong> for approval.
+                  Admin will also receive an email notification.
+                </p>
+              </div>
+            </div>
+
+            <Tabs value={requestType} onValueChange={setRequestType} className="mt-1">
               <TabsList className="w-full">
                 <TabsTrigger value="leave" className="flex-1">
                   Leave
@@ -283,7 +361,8 @@ export default function LeavePage() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="leave">
-            {isRegularEmployee ? "My leave" : "Leave requests"} ({filteredLeave.length})
+            {isRegularEmployee ? "My leave" : "Leave requests"} (
+            {filteredLeave.length})
           </TabsTrigger>
           <TabsTrigger value="wfh">WFH ({filteredWfh.length})</TabsTrigger>
           <TabsTrigger value="permission">
@@ -292,6 +371,12 @@ export default function LeavePage() {
         </TabsList>
 
         <TabsContent value="leave" className="mt-4 space-y-2">
+          {filteredLeave.length === 0 && (
+            <Card className="p-8 text-center">
+              <p className="text-muted-foreground text-sm">No leave requests yet.</p>
+              <p className="text-xs text-muted-foreground mt-1">Click &quot;New request&quot; to apply for leave.</p>
+            </Card>
+          )}
           {filteredLeave.map((req) => {
             const emp = getEmployee(req.employeeId);
             if (!emp) return null;
@@ -330,9 +415,7 @@ export default function LeavePage() {
                   <div className="flex gap-2 mt-3 pl-12">
                     <Button
                       size="sm"
-                      onClick={() =>
-                        updateRequestStatus("leave", req.id, "approved", myId)
-                      }
+                      onClick={() => handleApprove("leave", req.id, emp.name)}
                       className="h-7 bg-primary hover:bg-teal-600 text-primary-foreground text-xs"
                     >
                       Approve
@@ -340,16 +423,14 @@ export default function LeavePage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() =>
-                        updateRequestStatus("leave", req.id, "rejected", myId)
-                      }
+                      onClick={() => handleReject("leave", req.id, emp.name)}
                       className="h-7 text-xs"
                     >
                       Reject
                     </Button>
                   </div>
                 )}
-                {req.status !== "pending" && req.status === "approved" && (
+                {req.status === "approved" && (
                   <p className="text-[11px] text-status-present mt-2 pl-12">
                     Approved
                   </p>
@@ -360,6 +441,12 @@ export default function LeavePage() {
         </TabsContent>
 
         <TabsContent value="wfh" className="mt-4 space-y-2">
+          {filteredWfh.length === 0 && (
+            <Card className="p-8 text-center">
+              <p className="text-muted-foreground text-sm">No WFH requests yet.</p>
+              <p className="text-xs text-muted-foreground mt-1">Click &quot;New request&quot; and select the WFH tab to apply.</p>
+            </Card>
+          )}
           {filteredWfh.map((req) => {
             const emp = getEmployee(req.employeeId);
             if (!emp) return null;
@@ -393,9 +480,7 @@ export default function LeavePage() {
                   <div className="flex gap-2 mt-3 pl-12">
                     <Button
                       size="sm"
-                      onClick={() =>
-                        updateRequestStatus("wfh", req.id, "approved", myId)
-                      }
+                      onClick={() => handleApprove("wfh", req.id, emp.name)}
                       className="h-7 bg-primary hover:bg-teal-600 text-primary-foreground text-xs"
                     >
                       Approve
@@ -403,9 +488,7 @@ export default function LeavePage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() =>
-                        updateRequestStatus("wfh", req.id, "rejected", myId)
-                      }
+                      onClick={() => handleReject("wfh", req.id, emp.name)}
                       className="h-7 text-xs"
                     >
                       Reject
@@ -418,6 +501,12 @@ export default function LeavePage() {
         </TabsContent>
 
         <TabsContent value="permission" className="mt-4 space-y-2">
+          {filteredPerm.length === 0 && (
+            <Card className="p-8 text-center">
+              <p className="text-muted-foreground text-sm">No permission requests yet.</p>
+              <p className="text-xs text-muted-foreground mt-1">Click &quot;New request&quot; and select the Permission tab to apply.</p>
+            </Card>
+          )}
           {filteredPerm.map((req) => {
             const emp = getEmployee(req.employeeId);
             if (!emp) return null;
@@ -426,7 +515,7 @@ export default function LeavePage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Avatar className="w-9 h-9">
-                      <AvatarFallback className="bg-status-permission-bg text-status-permission-text text-xs font-medium">
+                      <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
                         {getInitials(emp.name)}
                       </AvatarFallback>
                     </Avatar>
@@ -458,14 +547,7 @@ export default function LeavePage() {
                   <div className="flex gap-2 mt-3 pl-12">
                     <Button
                       size="sm"
-                      onClick={() =>
-                        updateRequestStatus(
-                          "permission",
-                          req.id,
-                          "approved",
-                          myId
-                        )
-                      }
+                      onClick={() => handleApprove("permission", req.id, emp.name)}
                       className="h-7 bg-primary hover:bg-teal-600 text-primary-foreground text-xs"
                     >
                       Approve
@@ -473,14 +555,7 @@ export default function LeavePage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() =>
-                        updateRequestStatus(
-                          "permission",
-                          req.id,
-                          "rejected",
-                          myId
-                        )
-                      }
+                      onClick={() => handleReject("permission", req.id, emp.name)}
                       className="h-7 text-xs"
                     >
                       Reject

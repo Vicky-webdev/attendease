@@ -10,9 +10,9 @@ import {
 } from "lucide-react";
 
 const actions = [
-  { href: "/leave/new", icon: CalendarPlus, label: "Apply leave" },
-  { href: "/permission/new", icon: DoorOpen, label: "Request permission" },
-  { href: "/wfh/new", icon: Home, label: "Apply WFH" },
+  { href: "/leave?new=leave", icon: CalendarPlus, label: "Apply leave" },
+  { href: "/leave?new=permission", icon: DoorOpen, label: "Request permission" },
+  { href: "/leave?new=wfh", icon: Home, label: "Apply WFH" },
   { href: "/reports", icon: FileBarChart, label: "View reports" },
   { href: "/calendar", icon: Calendar, label: "Calendar" },
 ];
